@@ -20,7 +20,8 @@ AUTHKEY = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 TORRENT_PASS = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 # 对于大于FL_THRESHOLD体积的种子使用免费令牌，单位字节Byte
 # 建议第一次运行的时候不要修改这个值，这样就不会在老种上使用令牌，之后运行的时候再调小
-FL_THRESHOLD = 100 * 1024**3 # 100GB
+FL_THRESHOLD_L = 200 * 1024**2 # 200M
+FL_THRESHOLD_H = 2 * 1024**3 # 2GB
 # 存储rss出来的种子的文件夹：
 DOWNLOAD_DIR = "./watch/"
 # 存储rss过的种子链接的文件：
@@ -45,7 +46,7 @@ def get_name(raw):
 LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 try:
-    resp = requests.get("https://dicmusic.club/ajax.php?action=notifications", cookies=COOKIES, timeout=10)
+    resp = requests.get("https://dicmusic.com/ajax.php?action=notifications", cookies=COOKIES, timeout=10)
     tlist = json.loads(resp.text)["response"]["results"]
 except:
     logging.info("fail to read from RSS url")
@@ -65,13 +66,17 @@ cnt = 0
 now = time.time()
 for t in tlist[:10]:
     tid = t["torrentId"]
-    dl_url_raw = "https://dicmusic.club/torrents.php?action=download&id={}&authkey={}&torrent_pass={}".format(tid, AUTHKEY, TORRENT_PASS)
+    dl_url_raw = "https://dicmusic.com/torrents.php?action=download&id={}&authkey={}&torrent_pass={}".format(tid, AUTHKEY, TORRENT_PASS)
     if dl_url_raw in downloaded:
         continue
-    if t["size"] > FL_THRESHOLD:
+    if t["size"] > FL_THRESHOLD_L and t["size"] < FL_THRESHOLD_H:
         dl_url = dl_url_raw + "&usetoken=1"
     else:
-        dl_url = dl_url_raw
+        with open(DOWNLOADED_URLS, "a") as f:
+            f.write("{}\n".format(dl_url_raw))
+        with open(os.path.join(DOWNLOAD_DIR, "{}.torrent".format(get_name(raw))), "wb") as f:
+            f.write(raw)
+        continue
     try:
         logging.info("download {}".format(dl_url_raw))
         resp = requests.get(dl_url, headers=HEADERS, timeout=120)
